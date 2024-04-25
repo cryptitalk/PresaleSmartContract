@@ -8,6 +8,8 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import "./TestErc721Token.sol";
 
 contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable {
     uint256 public presaleId;
@@ -84,6 +86,9 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
     event PresalePaused(uint256 indexed id, uint256 timestamp);
     event PresaleUnpaused(uint256 indexed id, uint256 timestamp);
 
+    // New event for NFT claiming
+    event NFTClaimed(address indexed user, uint256 indexed presaleId, uint256 indexed tokenId, uint256 timestamp);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -134,11 +139,11 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         );
         require(_price > 0, "Zero price");
         require(_tokensToSell > 0, "Zero tokens to sell");
-        require(_baseDecimals > 0, "Zero decimals for the token");
-        require(
-            _vestingStartTime >= _endTime,
-            "Vesting starts before Presale ends"
-        );
+        //require(_baseDecimals > 0, "Zero decimals for the token");
+        //require(
+        //    _vestingStartTime >= _endTime,
+        //    "Vesting starts before Presale ends"
+        //);
 
         presaleId++;
 
@@ -580,5 +585,26 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
             require(claim(users[i], _id), "Claim failed");
         }
         return true;
+    }
+
+    function claimNFT(address user, uint256 _id, string memory tokenURI) external nonReentrant {
+        uint256 amount = claimableAmount(user, _id);
+        require(amount > 0, "Zero claim amount");
+        require(
+            presale[_id].saleToken != address(0),
+            "Presale token address not set"
+        );
+
+        TestErc721Token nftContract = TestErc721Token(presale[_id].saleToken);
+        require(
+            amount <= nftContract.balanceOf(address(this)),
+            "Not enough tokens in the contract"
+        );
+        userVesting[user][_id].claimedAmount += amount;
+
+        for (uint i = 0; i < amount; i++) {
+            uint256 tokenId = nftContract.mintToken(user, tokenURI);
+            emit NFTClaimed(_msgSender(), _id, tokenId, block.timestamp);
+        }
     }
 }
