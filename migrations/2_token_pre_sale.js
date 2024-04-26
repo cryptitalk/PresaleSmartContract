@@ -1,5 +1,6 @@
 const { deployProxy } = require('@openzeppelin/truffle-upgrades');
 const TokenPreSale = artifacts.require("TokenPreSale");
+var TestUSDT = artifacts.require("TestUSDT");
 
 module.exports = async function (deployer) {
   // BSC Testnet
@@ -15,6 +16,8 @@ module.exports = async function (deployer) {
   // USDT Mainnet 0x55d398326f99059fF775485246999027B3197955
   // 
 
-  const instance = await deployProxy(TokenPreSale, ['0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526', '0x250df3426Facabb1a1AE0145ea2E86cdbb296fA7'], { deployer });
+  const testUSDT = await TestUSDT.deployed();
+  console.log("test usdt", testUSDT.address)
+  const instance = await deployProxy(TokenPreSale, ['0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526', testUSDT.address], { deployer });
   console.log('Deployed', instance.address);
 };

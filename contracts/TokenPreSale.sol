@@ -390,17 +390,32 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         Presale memory _presale = presale[_id];
 
         if (userVesting[_msgSender()][_id].totalAmount > 0) {
-            userVesting[_msgSender()][_id].totalAmount += (amount *
-                _presale.baseDecimals);
+            if(_presale.baseDecimals >0 ) {
+                userVesting[_msgSender()][_id].totalAmount += (amount *
+                    _presale.baseDecimals);
+            } else {
+                userVesting[_msgSender()][_id].totalAmount += amount;
+            }
         } else {
-            userVesting[_msgSender()][_id] = Vesting(
-                (amount * _presale.baseDecimals),
-                0,
-                _presale.vestingStartTime + _presale.vestingCliff,
-                _presale.vestingStartTime +
-                    _presale.vestingCliff +
-                    _presale.vestingPeriod
-            );
+            if(_presale.baseDecimals >0 ) {
+                userVesting[_msgSender()][_id] = Vesting(
+                    (amount * _presale.baseDecimals),
+                    0,
+                    _presale.vestingStartTime + _presale.vestingCliff,
+                    _presale.vestingStartTime +
+                        _presale.vestingCliff +
+                        _presale.vestingPeriod
+                );
+            } else {
+                userVesting[_msgSender()][_id] = Vesting(
+                    amount,
+                    0,
+                    _presale.vestingStartTime + _presale.vestingCliff,
+                    _presale.vestingStartTime +
+                        _presale.vestingCliff +
+                        _presale.vestingPeriod
+                );
+            }
         }
 
         uint256 ourAllowance = USDTInterface.allowance(
@@ -451,17 +466,32 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         Presale memory _presale = presale[_id];
 
         if (userVesting[_msgSender()][_id].totalAmount > 0) {
-            userVesting[_msgSender()][_id].totalAmount += (amount *
-                _presale.baseDecimals);
+            if (_presale.baseDecimals > 0) {
+                userVesting[_msgSender()][_id].totalAmount += (amount *
+                    _presale.baseDecimals);
+            } else {
+                userVesting[_msgSender()][_id].totalAmount += amount;
+            }
         } else {
-            userVesting[_msgSender()][_id] = Vesting(
-                (amount * _presale.baseDecimals),
-                0,
-                _presale.vestingStartTime + _presale.vestingCliff,
-                _presale.vestingStartTime +
-                    _presale.vestingCliff +
-                    _presale.vestingPeriod
-            );
+            if (_presale.baseDecimals > 0) {
+                userVesting[_msgSender()][_id] = Vesting(
+                    (amount * _presale.baseDecimals),
+                    0,
+                    _presale.vestingStartTime + _presale.vestingCliff,
+                    _presale.vestingStartTime +
+                        _presale.vestingCliff +
+                        _presale.vestingPeriod
+                );
+            } else {
+                userVesting[_msgSender()][_id] = Vesting(
+                    amount,
+                    0,
+                    _presale.vestingStartTime + _presale.vestingCliff,
+                    _presale.vestingStartTime +
+                        _presale.vestingCliff +
+                        _presale.vestingPeriod
+                );
+            }
         }
         sendValue(payable(owner()), ethAmount);
         if (excess > 0) sendValue(payable(_msgSender()), excess);
