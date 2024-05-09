@@ -29,6 +29,7 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         uint256 vestingPeriod;
         uint256 enableBuyWithEth;
         uint256 enableBuyWithUsdt;
+        address[] participants;
     }
 
     struct Vesting {
@@ -159,10 +160,16 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
             _vestingCliff,
             _vestingPeriod,
             _enableBuyWithEth,
-            _enableBuyWithUsdt
+            _enableBuyWithUsdt,
+            new address[](0)
         );
 
         emit PresaleCreated(presaleId, _tokensToSell, _startTime, _endTime, _enableBuyWithEth, _enableBuyWithUsdt);
+    }
+
+    function getPresaleParticipants(uint256 _id) external view returns (address[] memory) {
+        require(_id > 0 && _id <= presaleId, "Invalid presale id");
+        return presale[_id].participants;
     }
 
     /**
@@ -370,13 +377,8 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         _;
     }
 
-    /**
-     * @dev To buy into a presale using USDT
-     * @param _id Presale id
-     * @param amount No of tokens to buy
-     */
-    function buyWithUSDT(uint256 _id, uint256 amount)
-        external
+    function buyWithUSDTForAddress(uint256 _id, uint256 amount, address _user)
+        public
         checkPresaleId(_id)
         checkSaleState(_id, amount)
         returns (bool)
@@ -389,16 +391,17 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
 
         Presale memory _presale = presale[_id];
 
-        if (userVesting[_msgSender()][_id].totalAmount > 0) {
+        if (userVesting[_user][_id].totalAmount > 0) {
             if(_presale.baseDecimals >0 ) {
-                userVesting[_msgSender()][_id].totalAmount += (amount *
+                userVesting[_user][_id].totalAmount += (amount *
                     _presale.baseDecimals);
             } else {
-                userVesting[_msgSender()][_id].totalAmount += amount;
+                userVesting[_user][_id].totalAmount += amount;
             }
         } else {
+            presale[_id].participants.push(_user);
             if(_presale.baseDecimals >0 ) {
-                userVesting[_msgSender()][_id] = Vesting(
+                userVesting[_user][_id] = Vesting(
                     (amount * _presale.baseDecimals),
                     0,
                     _presale.vestingStartTime + _presale.vestingCliff,
@@ -407,7 +410,7 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
                         _presale.vestingPeriod
                 );
             } else {
-                userVesting[_msgSender()][_id] = Vesting(
+                userVesting[_user][_id] = Vesting(
                     amount,
                     0,
                     _presale.vestingStartTime + _presale.vestingCliff,
@@ -419,21 +422,21 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         }
 
         uint256 ourAllowance = USDTInterface.allowance(
-            _msgSender(),
+            _user,
             address(this)
         );
         require(usdPrice <= ourAllowance, "Make sure to add enough allowance");
         (bool success, ) = address(USDTInterface).call(
             abi.encodeWithSignature(
                 "transferFrom(address,address,uint256)",
-                _msgSender(),
+                _user,
                 owner(),
                 usdPrice
             )
         );
         require(success, "Token payment failed");
         emit TokensBought(
-            _msgSender(),
+            _user,
             _id,
             address(USDTInterface),
             amount,
@@ -444,12 +447,19 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
     }
 
     /**
-     * @dev To buy into a presale using ETH
+     * @dev To buy into a presale using USDT
      * @param _id Presale id
      * @param amount No of tokens to buy
      */
-    function buyWithEth(uint256 _id, uint256 amount)
+    function buyWithUSDT(uint256 _id, uint256 amount)
         external
+        returns (bool)
+    {
+        return buyWithUSDTForAddress(_id, amount, _msgSender());
+    }
+
+    function buyWithEthForAddress(uint256 _id, uint256 amount, address _user)
+        public
         payable
         checkPresaleId(_id)
         checkSaleState(_id, amount)
@@ -465,16 +475,17 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
         presale[_id].inSale -= amount;
         Presale memory _presale = presale[_id];
 
-        if (userVesting[_msgSender()][_id].totalAmount > 0) {
+        if (userVesting[_user][_id].totalAmount > 0) {
             if (_presale.baseDecimals > 0) {
-                userVesting[_msgSender()][_id].totalAmount += (amount *
+                userVesting[_user][_id].totalAmount += (amount *
                     _presale.baseDecimals);
             } else {
-                userVesting[_msgSender()][_id].totalAmount += amount;
+                userVesting[_user][_id].totalAmount += amount;
             }
         } else {
+            presale[_id].participants.push(_user);
             if (_presale.baseDecimals > 0) {
-                userVesting[_msgSender()][_id] = Vesting(
+                userVesting[_user][_id] = Vesting(
                     (amount * _presale.baseDecimals),
                     0,
                     _presale.vestingStartTime + _presale.vestingCliff,
@@ -483,7 +494,7 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
                         _presale.vestingPeriod
                 );
             } else {
-                userVesting[_msgSender()][_id] = Vesting(
+                userVesting[_user][_id] = Vesting(
                     amount,
                     0,
                     _presale.vestingStartTime + _presale.vestingCliff,
@@ -494,9 +505,9 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
             }
         }
         sendValue(payable(owner()), ethAmount);
-        if (excess > 0) sendValue(payable(_msgSender()), excess);
+        if (excess > 0) sendValue(payable(_user), excess);
         emit TokensBought(
-            _msgSender(),
+            _user,
             _id,
             address(0),
             amount,
@@ -504,6 +515,20 @@ contract TokenPreSale is Initializable, ReentrancyGuardUpgradeable, OwnableUpgra
             block.timestamp
         );
         return true;
+    }
+
+    /**
+     * @dev To buy into a presale using ETH
+     * @param _id Presale id
+     * @param amount No of tokens to buy
+     */
+    function buyWithEth(uint256 _id, uint256 amount)
+        external
+        payable
+        nonReentrant
+        returns (bool)
+    {
+        return buyWithEthForAddress(_id, amount, _msgSender());
     }
 
     /**
